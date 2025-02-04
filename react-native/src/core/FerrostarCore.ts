@@ -11,6 +11,7 @@ import {
 } from '../generated/ferrostar';
 import { getNanoTime } from './_utils';
 import type { AlternativeRouteProcessor } from './AlternativeRouteProcessor';
+import type { Tts } from './hooks/useTts';
 import {
   LocationProvider,
   type LocationProviderInterface,
@@ -84,6 +85,7 @@ export class FerrostarCore implements LocationUpdateListener {
   navigationControllerConfig: NavigationControllerConfig;
   locationProvider: LocationProviderInterface;
   routeProvider: RouteProviderInterface;
+  tts: Tts;
 
   /**
    * The minimum time to wait before initiating another route recalculation.
@@ -130,6 +132,7 @@ export class FerrostarCore implements LocationUpdateListener {
     profile: string,
     navigationControllerConfig: NavigationControllerConfig,
     options: Record<string, any> = {},
+    tts: Tts,
     locationProvider: LocationProviderInterface = new LocationProvider(),
     routeProvider: RouteProviderInterface = new RouteProvider(
       valhallaEndpointURL,
@@ -140,6 +143,7 @@ export class FerrostarCore implements LocationUpdateListener {
     this.navigationControllerConfig = navigationControllerConfig;
     this.routeProvider = routeProvider;
     this.locationProvider = locationProvider;
+    this.tts = tts;
   }
 
   async getRoutes(
@@ -283,6 +287,7 @@ export class FerrostarCore implements LocationUpdateListener {
 
     this._queuedUtteranceIds = [];
     // TODO: add TTS observer to clear queued utterances
+    this.tts.stop();
   }
 
   private async handleStateUpdate(newState: TripState, location: UserLocation) {
@@ -352,6 +357,14 @@ export class FerrostarCore implements LocationUpdateListener {
             this.isCalculatingNewRoute = false;
           }
           break;
+      }
+    }
+
+    const instruction = newState.inner.spokenInstruction;
+    if (instruction != undefined) {
+      if (!this._queuedUtteranceIds.includes(instruction.utteranceId)) {
+        this._queuedUtteranceIds.push(instruction.utteranceId);
+        this.tts.speak(instruction.text);
       }
     }
 
