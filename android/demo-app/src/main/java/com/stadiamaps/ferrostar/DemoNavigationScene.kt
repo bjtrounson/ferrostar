@@ -106,8 +106,7 @@ fun DemoNavigationScene(
                           modifier = modifier,
                           scope = scope,
                           isNavigating = navigationUiState.isNavigating(),
-                          locationProvider = viewModel.locationProvider,
-                          loc = loc)
+                          context = context)
                     }
                   }),
       onTapExit = { viewModel.stopNavigation() }) { uiState ->

@@ -87,12 +87,12 @@ object AppModule {
             navigationControllerConfig =
                 NavigationControllerConfig(
                     StepAdvanceMode.RelativeLineStringDistance(
-                        minimumHorizontalAccuracy = 25U,
+                        minimumHorizontalAccuracy = 50U,
                         specialAdvanceConditions =
                             // NOTE: We have not yet put this threshold through extensive real-world
                             // testing
                             SpecialAdvanceConditions.MinimumDistanceFromCurrentStepLine(10U)),
-                    RouteDeviationTracking.StaticThreshold(15U, 50.0),
+                    RouteDeviationTracking.StaticThreshold(15U, 250.0),
                     CourseFiltering.SNAP_TO_ROUTE),
             options =
                 mapOf(

@@ -1,0 +1,18 @@
+[
+  {
+    "matchings_index": 0,
+    "waypoint_index": 0,
+    "alternatives_count": 0,
+    "distance": 1.257,
+    "name": "Pease Street",
+    "location": [168.99058, -46.08316]
+  },
+  {
+    "matchings_index": 0,
+    "waypoint_index": 0,
+    "alternatives_count": 0,
+    "distance": 1.538,
+    "name": "",
+    "location": [168.010608, -46.042645]
+  }
+]

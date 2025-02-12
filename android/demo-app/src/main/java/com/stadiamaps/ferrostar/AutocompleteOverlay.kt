@@ -1,7 +1,10 @@
 package com.stadiamaps.ferrostar
 
+import android.content.Context
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -10,52 +13,60 @@ import com.stadiamaps.autocomplete.center
 import com.stadiamaps.ferrostar.composeui.views.components.gridviews.InnerGridView
 import com.stadiamaps.ferrostar.core.LocationProvider
 import com.stadiamaps.ferrostar.core.SimulatedLocationProvider
+import com.stadiamaps.ferrostar.core.extensions.fromOsrm
 import com.stadiamaps.ferrostar.core.toAndroidLocation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import uniffi.ferrostar.GeographicCoordinate
+import uniffi.ferrostar.Route
 import uniffi.ferrostar.UserLocation
 import uniffi.ferrostar.Waypoint
 import uniffi.ferrostar.WaypointKind
 
 @Composable
 fun AutocompleteOverlay(
+    context: Context,
     modifier: Modifier = Modifier,
     scope: CoroutineScope,
     isNavigating: Boolean,
-    locationProvider: LocationProvider,
-    loc: UserLocation
 ) {
   if (!isNavigating) {
     InnerGridView(
         modifier = modifier.fillMaxSize().padding(bottom = 16.dp, top = 16.dp),
         topCenter = {
-          AppModule.stadiaApiKey?.let { apiKey ->
-            AutocompleteSearch(apiKey = apiKey, userLocation = loc.toAndroidLocation()) { feature ->
-              feature.center()?.let { center ->
-                // Fetch a route in the background
-                scope.launch(Dispatchers.IO) {
-                  // TODO: Fail gracefully
-                  val routes =
-                      AppModule.ferrostarCore.getRoutes(
-                          loc,
-                          listOf(
-                              Waypoint(
-                                  coordinate =
-                                      GeographicCoordinate(center.latitude, center.longitude),
-                                  kind = WaypointKind.BREAK),
-                          ))
-
-                  val route = routes.first()
-                  AppModule.ferrostarCore.startNavigation(route = route)
-
-                  if (locationProvider is SimulatedLocationProvider) {
-                    locationProvider.setSimulatedRoute(route)
-                  }
-                }
+          Button(onClick = { scope.launch {
+              var routeBuffer: ByteArray? = null;
+              var waypointBuffer: ByteArray? = null;
+              try {
+                  val stream = context.assets.open("TextToSpeech_Repeating_Voice_Instruction_Bug_Route.json");
+                  val size = stream.available();
+                  routeBuffer = ByteArray(size);
+                  stream.read(routeBuffer);
+                  stream.close();
+              } catch (e: Exception) {
+                  e.printStackTrace();
               }
-            }
+
+              try {
+                  val stream = context.assets.open("TextToSpeech_Repeating_Voice_Instruction_Bug_Waypoints.json");
+                  val size = stream.available();
+                  waypointBuffer = ByteArray(size);
+                  stream.read(waypointBuffer);
+                  stream.close();
+              } catch (e: Exception) {
+                  e.printStackTrace();
+              }
+
+              if (routeBuffer == null || waypointBuffer == null) {
+                  return@launch;
+              }
+
+              val route = Route.fromOsrm(routeBuffer, waypointBuffer, 6u);
+
+              AppModule.ferrostarCore.startNavigation(route = route);
+          } }) {
+            Text(text = "Start Navigation")
           }
         })
   }
