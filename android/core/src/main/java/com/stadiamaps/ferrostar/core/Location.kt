@@ -26,6 +26,7 @@ import uniffi.ferrostar.Route
 import uniffi.ferrostar.Speed
 import uniffi.ferrostar.UserLocation
 import uniffi.ferrostar.advanceLocationSimulation
+import uniffi.ferrostar.locationSimulationFromCoordinates
 import uniffi.ferrostar.locationSimulationFromRoute
 
 interface LocationProvider {
@@ -169,7 +170,7 @@ class SimulatedLocationProvider : LocationProvider {
     }
   }
 
-  fun setSimulatedRoute(route: Route, bias: LocationBias = LocationBias.None) {
+  fun setSimulatedStateFromRoute(route: Route, bias: LocationBias = LocationBias.None) {
     simulationState = locationSimulationFromRoute(route, resampleDistance = 10.0, bias)
     lastLocation = simulationState?.currentLocation
 
@@ -178,6 +179,14 @@ class SimulatedLocationProvider : LocationProvider {
     }
   }
 
+  fun setSimulatedStateFromCoordinates(coordinates: List<GeographicCoordinate>, bias: LocationBias = LocationBias.None) {
+    simulationState = locationSimulationFromCoordinates(coordinates, resampleDistance = 10.0, bias)
+    lastLocation = simulationState?.currentLocation
+
+    if (listeners.isNotEmpty() && simulationJob?.isActive != true) {
+      simulationJob = scope.launch { startSimulation() }
+    }
+  }
   private suspend fun startSimulation() {
     var pendingCompletion = false
 

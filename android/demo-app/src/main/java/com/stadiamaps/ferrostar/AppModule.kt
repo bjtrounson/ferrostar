@@ -9,6 +9,7 @@ import com.stadiamaps.ferrostar.core.CorrectiveAction
 import com.stadiamaps.ferrostar.core.FerrostarCore
 import com.stadiamaps.ferrostar.core.LocationProvider
 import com.stadiamaps.ferrostar.core.RouteDeviationHandler
+import com.stadiamaps.ferrostar.core.SimulatedLocationProvider
 import com.stadiamaps.ferrostar.core.service.FerrostarForegroundServiceManager
 import com.stadiamaps.ferrostar.core.service.ForegroundServiceManager
 import com.stadiamaps.ferrostar.googleplayservices.FusedLocationProvider
@@ -66,7 +67,7 @@ object AppModule {
 
   val locationProvider: LocationProvider by lazy {
     // TODO: Make this configurable?
-    FusedLocationProvider(appContext)
+      SimulatedLocationProvider()
   }
   private val httpClient: OkHttpClient by lazy {
     OkHttpClient.Builder().callTimeout(Duration.ofSeconds(15)).build()

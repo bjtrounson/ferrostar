@@ -8,6 +8,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.stadiamaps.autocomplete.AutocompleteSearch
 import com.stadiamaps.autocomplete.center
 import com.stadiamaps.ferrostar.composeui.views.components.gridviews.InnerGridView
@@ -63,6 +65,22 @@ fun AutocompleteOverlay(
               }
 
               val route = Route.fromOsrm(routeBuffer, waypointBuffer, 6u);
+
+              var locationsRaw: String = "";
+              try {
+                  val stream = context.assets.open("TextToSpeech_Repeating_Voice_Instruction_Bug_SimulatedLocations.json");
+                  val size = stream.available();
+                  val locationBuffer = ByteArray(size);
+                  stream.read(locationBuffer);
+                  stream.close();
+                  locationsRaw = locationBuffer.decodeToString();
+              } catch (e: Exception) {
+                  e.printStackTrace();
+              }
+
+              val locations = Gson().fromJson<List<GeographicCoordinate>>(locationsRaw, object : TypeToken<List<GeographicCoordinate>>() {}.type);
+
+              (AppModule.locationProvider as SimulatedLocationProvider).setSimulatedStateFromCoordinates(locations);
 
               AppModule.ferrostarCore.startNavigation(route = route);
           } }) {

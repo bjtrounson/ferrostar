@@ -101,13 +101,11 @@ fun DemoNavigationScene(
           NavigationViewComponentBuilder.Default()
               .withCustomOverlayView(
                   customOverlayView = { modifier ->
-                    navigationUiState.location?.let { loc ->
                       AutocompleteOverlay(
                           modifier = modifier,
                           scope = scope,
                           isNavigating = navigationUiState.isNavigating(),
                           context = context)
-                    }
                   }),
       onTapExit = { viewModel.stopNavigation() }) { uiState ->
         // Trivial, if silly example of how to add your own overlay layers.
