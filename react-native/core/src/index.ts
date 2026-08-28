@@ -6,6 +6,10 @@ export * from './RouteDeviationHandler';
 export * from './AlternativeRouteProcessor';
 export * from './SpeechEngine';
 
+// Annotations
+export * from './annotations/Annotation';
+export * from './annotations/ValhallaExtendedOSRMAnnotation';
+
 // Exceptions
 export * from './FerrostarCoreException';
 
@@ -13,6 +17,7 @@ export * from './FerrostarCoreException';
 export * from './hooks/useNavigationState';
 export * from './hooks/useFerrostar';
 export * from './hooks/useRoutes';
+export * from './hooks/useAnnotation';
 
 // Contexts
 export * from './contexts/FerrostarProvider';
