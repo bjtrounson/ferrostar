@@ -73,6 +73,10 @@
     "url": "https://github.com/stadiamaps/ferrostar/issues"
   },
   "homepage": "https://github.com/stadiamaps/ferrostar#readme",
+  "dependencies": {
+    "@ubjs/core": "0.31.0-5",
+    "uniffi-bindgen-react-native": "0.31.0-5"
+  },
   "devDependencies": {
     "@react-native-community/cli": "20.0.0",
     "@release-it/conventional-changelog": "^9.0.2",
@@ -84,8 +88,7 @@
     "react-native": "^0.78.0",
     "react-native-builder-bob": "^0.40.12",
     "release-it": "^17.10.0",
-    "typescript": "^5.2.2",
-    "uniffi-bindgen-react-native": "0.31.0-5"
+    "typescript": "^5.2.2"
   },
   "peerDependencies": {
     "react": "*",
