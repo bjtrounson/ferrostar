@@ -346,3 +346,5 @@ This chapter introduces the core integration and prebuilt UI.
 For more control,
 implement the `LocationProvider`, `RouteProvider`, or `SpeechEngine` interfaces,
 or compose the individual components exported by the MapLibre UI package.
+See [Session Recording](./session-recording.md)
+when collecting detailed navigation traces for debugging.

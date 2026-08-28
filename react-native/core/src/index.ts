@@ -6,6 +6,7 @@ export * from './RouteDeviationHandler';
 export * from './AlternativeRouteProcessor';
 export * from './SpeechEngine';
 export * from './ForegroundService';
+export * from './NavigationRecording';
 
 // Annotations
 export * from './annotations/Annotation';

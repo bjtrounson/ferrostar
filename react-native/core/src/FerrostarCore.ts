@@ -2,6 +2,8 @@ import {
   type GeographicCoordinate,
   type Heading,
   type NavigationSessionLike,
+  type NavigationObserver,
+  NavigationRecorder,
   type Route,
   RouteDeviation,
   UserLocation,
@@ -34,6 +36,10 @@ import {
 } from './RouteDeviationHandler';
 import { type RouteProvider } from './RouteProvider';
 import { ManualSpeechEngine, type SpeechEngine } from './SpeechEngine';
+import type {
+  NavigationRecording,
+  RecordedNavigationOptions,
+} from './NavigationRecording';
 
 /**
  * Represents the complete state of the navigation session.
@@ -158,6 +164,7 @@ export class FerrostarCore implements LocationObserver {
   private _locationProviderConnectionId: number = 0;
   private _activeForegroundService?: ForegroundService;
   private _foregroundServiceOperations: Promise<void> = Promise.resolve();
+  private _activeNavigationRecorder?: NavigationRecorder;
 
   constructor(
     navigationControllerConfig: NavigationControllerConfig,
@@ -280,28 +287,45 @@ export class FerrostarCore implements LocationObserver {
   /**
    * Starts a navigation session with the given parameters (erasing any previous state).
    *
-   * Once you have a location fix and a desired route, invoke this method. It will automatically
-   * subscribe to location provider updates. Returns a view model which is tied to the navigation
-   * session. You can observe this in either your own or one of the provided navigation compose
-   * views.
+   * Once you have a location fix and a desired route, invoke this method.
+   * Pass `{ recording: true }` to receive a recording handle for this session.
    *
-   * WARNING: If you want to reuse the existing view model, ex: when getting a new route after going
-   * off course, use {@link replaceRoute} instead! Otherwise, you will miss out on updates as the old view
-   * model is "orphaned"!
+   * When changing the route during navigation, use {@link replaceRoute} so the existing
+   * foreground-service and recording lifecycles remain active.
    *
    * @param route the route to navigate.
-   * @param config change the configuration in the core before staring navigation. This was
-   *   originally provided on init, but you can set a new value for future sessions.
+   * @param configOrOptions change the configuration in the core before starting navigation,
+   *   or explicitly enable recording for this session.
    * @throws UserLocationUnknown if the location provider has no last known location.
    */
-  startNavigation(route: Route, config?: NavigationControllerConfig) {
+  startNavigation(
+    route: Route,
+    options: RecordedNavigationOptions
+  ): NavigationRecording;
+  startNavigation(route: Route, config?: NavigationControllerConfig): void;
+  startNavigation(
+    route: Route,
+    configOrOptions?: NavigationControllerConfig | RecordedNavigationOptions
+  ): NavigationRecording | void {
     this.stopNavigation();
 
+    let config: NavigationControllerConfig | undefined;
+    let shouldRecord = false;
+    if (isRecordedNavigationOptions(configOrOptions)) {
+      config = configOrOptions.config;
+      shouldRecord = true;
+    } else {
+      config = configOrOptions;
+    }
+
     this.navigationControllerConfig = config ?? this.navigationControllerConfig;
-    const session = createNavigationSession(
+    const recorder = shouldRecord
+      ? new NavigationRecorder(route, this.navigationControllerConfig)
+      : undefined;
+    const session = this.createSession(
       route,
-      config ?? this.navigationControllerConfig,
-      []
+      this.navigationControllerConfig,
+      recorder
     );
 
     const startingLocation =
@@ -317,10 +341,13 @@ export class FerrostarCore implements LocationObserver {
     const initialTripState = session.getInitialState(startingLocation);
 
     this._navigationSession = session;
+    this._activeNavigationRecorder = recorder;
     this._state.set(initialTripState, route.geometry, false);
 
     this.startForegroundService();
     this.handleStateUpdate(initialTripState, startingLocation);
+
+    return recorder;
   }
 
   /**
@@ -336,11 +363,7 @@ export class FerrostarCore implements LocationObserver {
   replaceRoute(route: Route, config?: NavigationControllerConfig) {
     this.navigationControllerConfig = config ?? this.navigationControllerConfig;
 
-    const session = createNavigationSession(
-      route,
-      config ?? this.navigationControllerConfig,
-      []
-    );
+    const session = this.createSession(route, this.navigationControllerConfig);
 
     const startingLocation =
       this._lastLocation ??
@@ -385,6 +408,7 @@ export class FerrostarCore implements LocationObserver {
     const wasNavigating = this._state.isNavigating();
 
     this._navigationSession = undefined;
+    this._activeNavigationRecorder = undefined;
     this.stopForegroundService();
 
     if (wasNavigating) {
@@ -411,6 +435,15 @@ export class FerrostarCore implements LocationObserver {
 
   handleMuted(muted: boolean) {
     this._isMuted = muted;
+  }
+
+  private createSession(
+    route: Route,
+    config: NavigationControllerConfig,
+    recorder: NavigationRecorder | undefined = this._activeNavigationRecorder
+  ): NavigationSessionLike {
+    const observers: Array<NavigationObserver> = recorder ? [recorder] : [];
+    return createNavigationSession(route, config, observers);
   }
 
   private async handleStateUpdate(newState: NavState, location: UserLocation) {
@@ -638,4 +671,15 @@ export class FerrostarCore implements LocationObserver {
     state.isCalculatingNewRoute = this._state.isCalculatingNewRoute;
     return state;
   }
+}
+
+function isRecordedNavigationOptions(
+  value: NavigationControllerConfig | RecordedNavigationOptions | undefined
+): value is RecordedNavigationOptions {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'recording' in value &&
+    value.recording === true
+  );
 }

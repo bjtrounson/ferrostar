@@ -84,7 +84,70 @@ construct a `FerrostarSessionBuilder` yourself,
 call `withRecorder` on it,
 and pass it as the `sessionBuilder` argument to `FerrostarCore`.
 
-### TypeScript
+### React Native
+
+Recording is explicitly enabled for an individual navigation session.
+The recorded form of `startNavigation` returns a handle
+that remains readable after navigation stops.
+
+```typescript
+import {useRef} from 'react';
+import {
+  useFerrostar,
+  type NavigationRecording,
+} from '@stadiamaps/ferrostar-core-react-native';
+import type {Route} from '@stadiamaps/ferrostar-uniffi-react-native';
+
+function useRecordedNavigation() {
+  const core = useFerrostar();
+  const recording = useRef<NavigationRecording>();
+
+  function startNavigation(route: Route) {
+    recording.current = core.startNavigation(route, {
+      recording: true,
+    });
+  }
+
+  async function stopNavigation() {
+    core.stopNavigation();
+
+    const json = recording.current?.getRecordingJson();
+    recording.current = undefined;
+
+    if (json) {
+      await applicationRecordingStore.save(json);
+    }
+  }
+
+  return {startNavigation, stopNavigation};
+}
+```
+
+Here, `applicationRecordingStore` represents storage chosen by your application.
+It might write through an Expo or bare React Native filesystem library,
+upload to a secure service,
+or open a platform share sheet.
+Ferrostar does not automatically write, upload, or share the recording.
+
+To override the navigation configuration for the recorded session,
+include it in the same options object:
+
+```typescript
+const recording = core.startNavigation(route, {
+  recording: true,
+  config,
+});
+```
+
+`recording.getEvents()` is also available for diagnostics,
+but it copies the current event collection across the native boundary.
+Do not poll it during navigation or use it to drive React rendering.
+The recorder remains attached when Ferrostar replaces the route,
+including during automatic rerouting.
+The replacement route itself is not currently serialized as a route-update event,
+so fully replaying a session that rerouted remains a known limitation.
+
+### Web
 
 The web component exposes recording as a single boolean attribute on `<ferrostar-core>`.
 When the attribute is set,
@@ -142,4 +205,3 @@ and use the playback controls to scrub, pause, and adjust speed.
 The source code for this lives under [`web/tools/replay/`](https://github.com/stadiamaps/ferrostar/tree/main/web/tools/replay)
 and serves as an example implementation.
 You can also build your own replay functionality into your app.
-
