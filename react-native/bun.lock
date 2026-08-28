@@ -143,7 +143,7 @@
         "react-native-builder-bob": "^0.40.12",
         "release-it": "^17.10.0",
         "typescript": "^5.2.2",
-        "uniffi-bindgen-react-native": "0.31.0-2",
+        "uniffi-bindgen-react-native": "0.31.0-5",
       },
       "peerDependencies": {
         "react": "*",
@@ -2790,7 +2790,7 @@
 
     "unicorn-magic": ["unicorn-magic@0.1.0", "", {}, "sha512-lRfVq8fE8gz6QMBuDM6a+LO3IAzTi05H6gCVaUpir2E1Rwpo4ZUog45KpNXKC/Mn3Yb9UDuHumeFTo9iV/D9FQ=="],
 
-    "uniffi-bindgen-react-native": ["uniffi-bindgen-react-native@0.31.0-2", "", { "bin": { "ubrn": "bin/cli.cjs", "uniffi-bindgen-react-native": "bin/cli.cjs" } }, "sha512-kcmW4/ayEEQH3mg4r3wJAgDoBd7Ix7Y/4E2npS51ydUKuHMzLsTU+lgzanZVAwC+yQsDduEK63TFXq54imJWsA=="],
+    "uniffi-bindgen-react-native": ["uniffi-bindgen-react-native@0.31.0-5", "", { "bin": { "ubrn": "bin/cli.cjs", "uniffi-bindgen-react-native": "bin/cli.cjs" } }, "sha512-YtL3gTe+RVXAQx/2P2Iuypic/CunRZC65Cs47v//YRfwWNYU4Ufd1jT3rqxSrH5b5QFCYblP89Nf/9ssZRvNgg=="],
 
     "universal-user-agent": ["universal-user-agent@6.0.1", "", {}, "sha512-yCzhz6FN2wU1NiiQRogkTQszlQSlpWaw8SvVegAc+bDxbzHgh1vX8uIe8OYyMH6DwH+sdTJsgMl36+mSMdRJIQ=="],
 

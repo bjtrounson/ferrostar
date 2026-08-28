@@ -234,6 +234,7 @@ pub enum WellKnownRouteProvider {
         ///
         /// This value must be a stringified representation of a JSON object.
         #[serde(default)]
+        #[cfg_attr(feature = "uniffi", uniffi(default))]
         options_json: Option<String>,
     },
     /// A GraphHopper-based routing API.
@@ -254,6 +255,7 @@ pub enum WellKnownRouteProvider {
         ///
         /// This value must be a stringified representation of a JSON object.
         #[serde(default)]
+        #[cfg_attr(feature = "uniffi", uniffi(default))]
         options_json: Option<String>,
     },
 }

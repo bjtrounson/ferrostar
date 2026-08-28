@@ -21,7 +21,7 @@ pub mod models;
 pub trait NavigationCache: Send + Sync {
     fn save(&self, record: Vec<u8>);
     fn load(&self) -> Option<Vec<u8>>;
-    fn remove(&self);
+    fn delete(&self);
 }
 
 #[cfg(feature = "uniffi")]
@@ -61,7 +61,7 @@ impl NavigationSessionCache {
 
                 if age > max_age {
                     // The record is stale. Delete it from the cache.
-                    self.cache.remove();
+                    self.cache.delete();
                     None
                 } else {
                     Some(record)
