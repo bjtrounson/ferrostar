@@ -31,6 +31,10 @@ vi.mock('@stadiamaps/ferrostar-uniffi-react-native', () => ({
 
 import { createNavigationSession } from '@stadiamaps/ferrostar-uniffi-react-native';
 import { FerrostarCore } from '../FerrostarCore';
+import type {
+  ForegroundService,
+  ForegroundServiceStartOptions,
+} from '../ForegroundService';
 import {
   ManualLocationProvider,
   SimulatedLocationProvider,
@@ -79,6 +83,32 @@ class AsyncFakeLocationProvider extends FakeLocationProvider {
     });
   }
 }
+
+class FakeForegroundService implements ForegroundService {
+  events: Array<string> = [];
+  startOptions?: ForegroundServiceStartOptions;
+  states: Array<unknown> = [];
+
+  start(options: ForegroundServiceStartOptions): void {
+    this.events.push('start');
+    this.startOptions = options;
+  }
+
+  update(state: unknown): void {
+    this.events.push('update');
+    this.states.push(state);
+  }
+
+  stop(): void {
+    this.events.push('stop');
+  }
+}
+
+const flushForegroundServiceOperations = async (): Promise<void> => {
+  for (let operation = 0; operation < 10; operation += 1) {
+    await Promise.resolve();
+  }
+};
 
 const createRouteProvider = (): RouteProvider => ({
   kind: 'custom',
@@ -331,5 +361,126 @@ describe('FerrostarCore lifecycle', () => {
     );
 
     expect(firstCore._state).not.toBe(secondCore._state);
+  });
+
+  it('drives the foreground service for the navigation lifecycle', async () => {
+    mockSession();
+    const foregroundService = new FakeForegroundService();
+    const core = new FerrostarCore(
+      {} as any,
+      new FakeLocationProvider(),
+      createRouteProvider(),
+      undefined,
+      undefined,
+      foregroundService
+    );
+
+    core.startNavigation(createRoute());
+    await flushForegroundServiceOperations();
+
+    expect(foregroundService.events).toEqual(['start', 'update']);
+    expect(foregroundService.states[0]).not.toBe(core._state);
+    expect(
+      (foregroundService.states[0] as { navState?: unknown }).navState
+    ).toBe(core._state.navState);
+
+    foregroundService.startOptions?.stopNavigation();
+    await flushForegroundServiceOperations();
+
+    expect(foregroundService.events).toEqual(['start', 'update', 'stop']);
+    expect(core._state.isNavigating()).toBe(false);
+  });
+
+  it('waits for foreground service start before sending updates', async () => {
+    mockSession();
+    let finishStarting: (() => void) | undefined;
+    const foregroundService: ForegroundService = {
+      start: vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finishStarting = resolve;
+          })
+      ),
+      update: vi.fn(),
+      stop: vi.fn(),
+    };
+    const core = new FerrostarCore(
+      {} as any,
+      new FakeLocationProvider(),
+      createRouteProvider(),
+      undefined,
+      undefined,
+      foregroundService
+    );
+
+    core.startNavigation(createRoute());
+    await Promise.resolve();
+
+    expect(foregroundService.start).toHaveBeenCalledTimes(1);
+    expect(foregroundService.update).not.toHaveBeenCalled();
+
+    finishStarting?.();
+    await flushForegroundServiceOperations();
+
+    expect(foregroundService.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not restart the foreground service when replacing a route', async () => {
+    mockSession();
+    const foregroundService = new FakeForegroundService();
+    const core = new FerrostarCore(
+      {} as any,
+      new FakeLocationProvider(),
+      createRouteProvider(),
+      undefined,
+      undefined,
+      foregroundService
+    );
+
+    core.startNavigation(createRoute());
+    core.replaceRoute(createRoute());
+    await flushForegroundServiceOperations();
+
+    expect(
+      foregroundService.events.filter((event) => event === 'start')
+    ).toHaveLength(1);
+    expect(
+      foregroundService.events.filter((event) => event === 'update')
+    ).toHaveLength(2);
+  });
+
+  it('continues foreground cleanup after an adapter failure', async () => {
+    mockSession();
+    const expectedError = new Error('could not start');
+    const foregroundService: ForegroundService = {
+      start: vi.fn(() => {
+        throw expectedError;
+      }),
+      update: vi.fn(),
+      stop: vi.fn(),
+    };
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    const core = new FerrostarCore(
+      {} as any,
+      new FakeLocationProvider(),
+      createRouteProvider(),
+      undefined,
+      undefined,
+      foregroundService
+    );
+
+    core.startNavigation(createRoute());
+    core.stopNavigation();
+    await flushForegroundServiceOperations();
+
+    expect(consoleError).toHaveBeenCalledWith(
+      'Foreground service start failed:',
+      expectedError
+    );
+    expect(foregroundService.stop).toHaveBeenCalledTimes(1);
+
+    consoleError.mockRestore();
   });
 });

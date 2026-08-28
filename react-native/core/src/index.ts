@@ -5,6 +5,7 @@ export * from './RouteProvider';
 export * from './RouteDeviationHandler';
 export * from './AlternativeRouteProcessor';
 export * from './SpeechEngine';
+export * from './ForegroundService';
 
 // Annotations
 export * from './annotations/Annotation';

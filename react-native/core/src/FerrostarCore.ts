@@ -25,7 +25,9 @@ import {
   type LocationProvider,
   type LocationSnapshot,
   type LocationSubscription,
+  type MaybePromise,
 } from './LocationProvider';
+import type { ForegroundService } from './ForegroundService';
 import {
   CorrectiveAction,
   type RouteDeviationHandler,
@@ -104,6 +106,12 @@ export class FerrostarCore implements LocationObserver {
   speechEngine: SpeechEngine;
 
   /**
+   * Optional platform adapter for a foreground notification, Live Activity,
+   * or another application-owned navigation experience.
+   */
+  foregroundService?: ForegroundService;
+
+  /**
    * The minimum time to wait before initiating another route recalculation.
    *
    * This matters in the case that a user is off route, the framework calculates a new route, and
@@ -148,19 +156,23 @@ export class FerrostarCore implements LocationObserver {
   private _nextListenerId: number = 1;
   private _locationSubscription?: LocationSubscription;
   private _locationProviderConnectionId: number = 0;
+  private _activeForegroundService?: ForegroundService;
+  private _foregroundServiceOperations: Promise<void> = Promise.resolve();
 
   constructor(
     navigationControllerConfig: NavigationControllerConfig,
     locationProvider: LocationProvider = new ManualLocationProvider(),
     routeProvider: RouteProvider,
     speechEngine: SpeechEngine = ManualSpeechEngine,
-    deviationHandler?: RouteDeviationHandler
+    deviationHandler?: RouteDeviationHandler,
+    foregroundService?: ForegroundService
   ) {
     this.navigationControllerConfig = navigationControllerConfig;
     this.routeProvider = routeProvider;
     this.locationProvider = locationProvider;
     this.speechEngine = speechEngine;
     this.deviationHandler = deviationHandler;
+    this.foregroundService = foregroundService;
   }
 
   async connectLocationProvider(
@@ -307,6 +319,7 @@ export class FerrostarCore implements LocationObserver {
     this._navigationSession = session;
     this._state.set(initialTripState, route.geometry, false);
 
+    this.startForegroundService();
     this.handleStateUpdate(initialTripState, startingLocation);
   }
 
@@ -372,6 +385,7 @@ export class FerrostarCore implements LocationObserver {
     const wasNavigating = this._state.isNavigating();
 
     this._navigationSession = undefined;
+    this.stopForegroundService();
 
     if (wasNavigating) {
       this._state.reset();
@@ -538,8 +552,6 @@ export class FerrostarCore implements LocationObserver {
 
   // TODO: handle the spoken instructions queue here
 
-  // TODO: foreground service update here
-
   private updateLocationSnapshot(snapshot?: LocationSnapshot): void {
     if (!snapshot) {
       return;
@@ -569,5 +581,61 @@ export class FerrostarCore implements LocationObserver {
     this._listeners.forEach((listener) => {
       listener(this._state);
     });
+
+    const foregroundService = this._activeForegroundService;
+    if (foregroundService?.update) {
+      const state = this.snapshotNavigationState();
+      this.enqueueForegroundServiceOperation('update', () =>
+        foregroundService.update?.(state)
+      );
+    }
+  }
+
+  private startForegroundService(): void {
+    const foregroundService = this.foregroundService;
+    if (!foregroundService) {
+      return;
+    }
+
+    this._activeForegroundService = foregroundService;
+    this.enqueueForegroundServiceOperation('start', () =>
+      foregroundService.start({
+        stopNavigation: () => this.stopNavigation(),
+      })
+    );
+  }
+
+  private stopForegroundService(): void {
+    const foregroundService = this._activeForegroundService;
+    if (!foregroundService) {
+      return;
+    }
+
+    this._activeForegroundService = undefined;
+    this.enqueueForegroundServiceOperation('stop', () =>
+      foregroundService.stop()
+    );
+  }
+
+  private enqueueForegroundServiceOperation(
+    operationName: 'start' | 'update' | 'stop',
+    operation: () => MaybePromise<void> | undefined
+  ): void {
+    this._foregroundServiceOperations = this._foregroundServiceOperations
+      .then(async () => {
+        await operation();
+      })
+      .catch((error: unknown) => {
+        console.error(`Foreground service ${operationName} failed:`, error);
+      });
+  }
+
+  private snapshotNavigationState(): NavigationState {
+    const state = new NavigationState();
+    state.tripState = this._state.tripState;
+    state.navState = this._state.navState;
+    state.routeGeometry = this._state.routeGeometry;
+    state.isCalculatingNewRoute = this._state.isCalculatingNewRoute;
+    return state;
   }
 }

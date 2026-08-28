@@ -8,6 +8,7 @@ import { ManualSpeechEngine, type SpeechEngine } from '../SpeechEngine';
 import { NavigationControllerConfig } from '@stadiamaps/ferrostar-uniffi-react-native';
 import type { RouteDeviationHandler } from '../RouteDeviationHandler';
 import type { RouteProvider } from '../RouteProvider';
+import type { ForegroundService } from '../ForegroundService';
 
 type FerrostarProviderContextType = {
   core: FerrostarCore;
@@ -23,6 +24,7 @@ type FerrostarProviderProps = {
   locationProvider?: LocationProvider;
   speechEngine?: SpeechEngine;
   deviationHandler?: RouteDeviationHandler;
+  foregroundService?: ForegroundService;
   children: ReactNode;
 };
 
@@ -32,6 +34,7 @@ export const FerrostarProvider = ({
   locationProvider,
   speechEngine,
   deviationHandler,
+  foregroundService,
   children,
 }: FerrostarProviderProps) => {
   const fallbackLocationProviderRef = useRef<LocationProvider>();
@@ -50,7 +53,8 @@ export const FerrostarProvider = ({
       effectiveLocationProvider,
       routeProvider,
       effectiveSpeechEngine,
-      deviationHandler
+      deviationHandler,
+      foregroundService
     );
   }
 
@@ -59,6 +63,13 @@ export const FerrostarProvider = ({
   core.routeProvider = routeProvider;
   core.speechEngine = effectiveSpeechEngine;
   core.deviationHandler = deviationHandler;
+  core.foregroundService = foregroundService;
+
+  useEffect(() => {
+    return () => {
+      core.stopNavigation();
+    };
+  }, [core]);
 
   useEffect(() => {
     void core.connectLocationProvider(effectiveLocationProvider);

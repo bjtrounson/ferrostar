@@ -160,6 +160,7 @@ describe('useFerrostar', () => {
     const provider = new FakeLocationProvider();
     const routeProvider = createRouteProvider();
 
+    const cores: Array<FerrostarCore> = [];
     let renderer!: TestRenderer.ReactTestRenderer;
     await TestRenderer.act(async () => {
       renderer = TestRenderer.create(
@@ -167,12 +168,19 @@ describe('useFerrostar', () => {
           config: {} as any,
           routeProvider,
           locationProvider: provider,
-          children: null,
+          children: React.createElement(Probe, {
+            onCore: (core) => cores.push(core),
+          }),
         } as any)
       );
     });
 
     expect(provider.observers.size).toBe(1);
+    const core = cores[cores.length - 1];
+    if (!core) {
+      throw new Error('Expected FerrostarProvider to create a core');
+    }
+    const stopNavigation = vi.spyOn(core, 'stopNavigation');
 
     await TestRenderer.act(async () => {
       renderer.unmount();
@@ -180,5 +188,6 @@ describe('useFerrostar', () => {
 
     expect(provider.observers.size).toBe(0);
     expect(provider.unsubscribeCalls).toBe(1);
+    expect(stopNavigation).toHaveBeenCalledTimes(1);
   });
 });

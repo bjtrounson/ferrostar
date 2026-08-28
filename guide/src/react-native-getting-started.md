@@ -110,6 +110,68 @@ use `SimulatedLocationProvider` instead.
 After selecting a route,
 call `setRoute(route)` to simulate progress along it.
 
+### Integrate foreground navigation
+
+Ferrostar does not depend on a particular background-location or notification library.
+Instead,
+provide a `ForegroundService` adapter that delegates to the APIs chosen by your app.
+The adapter starts with navigation,
+receives navigation state updates,
+and stops when the trip stops or `FerrostarProvider` unmounts.
+
+```typescript
+import {useMemo} from 'react';
+import type {
+  ForegroundService,
+  NavigationState,
+} from '@stadiamaps/ferrostar-core-react-native';
+
+function useForegroundService(): ForegroundService {
+  return useMemo(
+    () => ({
+      start: ({stopNavigation}) =>
+        platformNavigation.start({onStop: stopNavigation}),
+      update: (state: NavigationState) =>
+        platformNavigation.update(state.tripState),
+      stop: () => platformNavigation.stop(),
+    }),
+    []
+  );
+}
+```
+
+Here, `platformNavigation` represents your application integration.
+It can wrap an Android foreground service,
+an iOS Live Activity for presenting trip status,
+or foreground behavior supplied by your location library.
+The `update` method is optional when the platform integration does not display navigation state.
+
+Pass the stable adapter to the provider:
+
+```typescript
+const foregroundService = useForegroundService();
+
+return (
+  <FerrostarProvider
+    config={config}
+    foregroundService={foregroundService}
+    locationProvider={locationProvider}
+    routeProvider={routeProvider}
+  >
+    {children}
+  </FerrostarProvider>
+);
+```
+
+The adapter methods may be synchronous or return promises.
+Ferrostar executes them in order and reports failures to the console
+without interrupting navigation.
+Your application remains responsible for any permissions,
+native configuration,
+and background modes required by the chosen platform API.
+The adapter coordinates lifecycle events;
+it does not itself grant background execution.
+
 ## Configure Ferrostar
 
 Wrap the part of your component tree that uses Ferrostar in `FerrostarProvider`.
