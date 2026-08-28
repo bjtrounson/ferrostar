@@ -3,7 +3,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   resolve: {
     alias: {
-      react: new URL('./node_modules/react', import.meta.url).pathname,
+      'react': new URL('./node_modules/react', import.meta.url).pathname,
       'react-test-renderer': new URL(
         './node_modules/react-test-renderer',
         import.meta.url
@@ -14,6 +14,11 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: false,
-    include: ['core/**/*.test.ts', 'core/**/*.test.tsx'],
+    include: [
+      'core/**/*.test.ts',
+      'core/**/*.test.tsx',
+      'maplibreui/**/*.test.ts',
+      'maplibreui/**/*.test.tsx',
+    ],
   },
 });
