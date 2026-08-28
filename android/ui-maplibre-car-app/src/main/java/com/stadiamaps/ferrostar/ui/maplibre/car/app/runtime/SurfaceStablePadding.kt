@@ -10,12 +10,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
-import com.maplibre.compose.camera.models.CameraPadding
 
 @Composable
 fun surfaceStablePadding(
     stableArea: Rect?,
-    additionalPadding: PaddingValues? = null
+    additionalPadding: PaddingValues? = null,
 ): PaddingValues {
   val density = LocalDensity.current
   val surfaceSize = LocalWindowInfo.current.containerSize
@@ -33,7 +32,7 @@ fun surfaceStablePadding(
               start = stableArea.left.toDp() + extraStart,
               top = stableArea.top.toDp() + extraTop,
               end = (surfaceSize.width - stableArea.right).toDp() + extraEnd,
-              bottom = (surfaceSize.height - stableArea.bottom).toDp() + extraBottom
+              bottom = (surfaceSize.height - stableArea.bottom).toDp() + extraBottom,
           )
         }
       } else {
@@ -49,7 +48,7 @@ fun surfaceStableFractionalPadding(
     @FloatRange(from = 0.0, to = 1.0) start: Float = 0.0f,
     @FloatRange(from = 0.0, to = 1.0) top: Float = 0.0f,
     @FloatRange(from = 0.0, to = 1.0) end: Float = 0.0f,
-    @FloatRange(from = 0.0, to = 1.0) bottom: Float = 0.0f
+    @FloatRange(from = 0.0, to = 1.0) bottom: Float = 0.0f,
 ): PaddingValues {
   val density = LocalDensity.current
   val surfaceSize = LocalWindowInfo.current.containerSize
@@ -63,7 +62,7 @@ fun surfaceStableFractionalPadding(
               start = (stableArea.left + stableWidth * start).toDp(),
               top = (stableArea.top + stableHeight * top).toDp(),
               end = (surfaceSize.width - stableArea.right + stableWidth * end).toDp(),
-              bottom = (surfaceSize.height - stableArea.bottom + stableHeight * bottom).toDp()
+              bottom = (surfaceSize.height - stableArea.bottom + stableHeight * bottom).toDp(),
           )
         }
       } else {
@@ -71,33 +70,4 @@ fun surfaceStableFractionalPadding(
       }
 
   return padding
-}
-
-// CameraPadding
-
-@Composable
-fun surfaceStableCameraPadding(
-    stableArea: Rect?,
-    additionalPadding: PaddingValues? = null
-): CameraPadding {
-  val padding = surfaceStablePadding(stableArea, additionalPadding)
-  return CameraPadding.padding(padding)
-}
-
-@Composable
-fun surfaceStableFractionalCameraPadding(
-    stableArea: Rect?,
-    @FloatRange(from = 0.0, to = 1.0) start: Float = 0.0f,
-    @FloatRange(from = 0.0, to = 1.0) top: Float = 0.0f,
-    @FloatRange(from = 0.0, to = 1.0) end: Float = 0.0f,
-    @FloatRange(from = 0.0, to = 1.0) bottom: Float = 0.0f
-): CameraPadding {
-  val padding = surfaceStableFractionalPadding(
-      stableArea,
-      start = start,
-      top = top,
-      end = end,
-      bottom = bottom
-  )
-  return CameraPadding.padding(padding)
 }

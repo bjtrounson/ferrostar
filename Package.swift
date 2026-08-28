@@ -10,16 +10,16 @@ let useLocalMapLibreSwiftUIDSL = false
 
 if useLocalFramework {
     binaryTarget = .binaryTarget(
-        name: "FerrostarCoreRS",
+        name: "ferrostarFFI",
         // IMPORTANT: Swift packages importing this locally will not be able to
         // import Ferrostar core unless you specify this as a relative path!
         path: "./common/target/ios/libferrostar-rs.xcframework"
     )
 } else {
-    let releaseTag = "0.49.0"
-    let releaseChecksum = "7b201e32a4e55ea127ccb9c72d8fdbf09540755471b7794de90ca369b10ed314"
+    let releaseTag = "0.54.0"
+    let releaseChecksum = "cc07f6c970dc7f5943b1662a5a1ddd598eb8e6f61299043835cc2851bded4a48"
     binaryTarget = .binaryTarget(
-        name: "FerrostarCoreRS",
+        name: "ferrostarFFI",
         url:
         "https://github.com/stadiamaps/ferrostar/releases/download/\(releaseTag)/libferrostar-rs.xcframework.zip",
         checksum: releaseChecksum
@@ -31,7 +31,7 @@ if useLocalMapLibreSwiftUIDSL {
 } else {
     maplibreSwiftUIDSLPackage = .package(
         url: "https://github.com/maplibre/swiftui-dsl",
-        from: "0.23.0"
+        from: "0.25.0"
     )
 }
 
@@ -111,7 +111,7 @@ let package = Package(
         ),
         .target(
             name: "FerrostarCoreFFI",
-            dependencies: [.target(name: "FerrostarCoreRS")],
+            dependencies: [.target(name: "ferrostarFFI")],
             path: "apple/Sources/UniFFI"
         ),
 

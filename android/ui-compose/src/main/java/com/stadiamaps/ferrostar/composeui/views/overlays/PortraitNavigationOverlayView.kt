@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.stadiamaps.ferrostar.composeui.config.NavigationViewComponentBuilder
@@ -45,10 +46,12 @@ fun PortraitNavigationOverlayView(
     onClickZoomOut: (() -> Unit)? = null,
     views: NavigationViewComponentBuilder = NavigationViewComponentBuilder.Default(theme),
     mapViewInsets: MutableState<PaddingValues>,
+    contentPadding: PaddingValues? = null,
+    onProgressViewHeightChange: (Dp) -> Unit = {},
     onTapExit: (() -> Unit)? = null,
 ) {
   val density = LocalDensity.current
-  val windowInsets = WindowInsets.statusBars.asPaddingValues()
+  val resolvedPadding = contentPadding ?: WindowInsets.statusBars.asPaddingValues()
 
   val uiState by viewModel.navigationUiState.collectAsState()
 
@@ -59,17 +62,20 @@ fun PortraitNavigationOverlayView(
       NavigationViewMetrics(
               progressViewSize = progressViewSize,
               instructionsViewSize = instructionsViewSize,
-              buttonSize = theme.buttonSize)
+              buttonSize = theme.buttonSize,
+          )
           .mapViewInsets(
-              top = 32.dp + windowInsets.calculateTopPadding(),
-              bottom = 32.dp + windowInsets.calculateBottomPadding())
+              top = 32.dp + resolvedPadding.calculateTopPadding(),
+              bottom = 32.dp + resolvedPadding.calculateBottomPadding(),
+          )
 
   Column(modifier) {
     views.instructionsView(
         Modifier.onSizeChanged {
           instructionsViewSize = density.run { DpSize(it.width.toDp(), it.height.toDp()) }
         },
-        uiState)
+        uiState,
+    )
 
     NavigatingInnerGridView(
         modifier = Modifier.fillMaxSize().weight(1f).padding(bottom = 16.dp, top = 16.dp),
@@ -91,10 +97,13 @@ fun PortraitNavigationOverlayView(
 
     views.progressView(
         Modifier.onSizeChanged {
-          progressViewSize = density.run { DpSize(it.width.toDp(), it.height.toDp()) }
+          val size = density.run { DpSize(it.width.toDp(), it.height.toDp()) }
+          progressViewSize = size
+          onProgressViewHeightChange(size.height)
         },
         uiState,
-        onTapExit)
+        onTapExit,
+    )
   }
 }
 

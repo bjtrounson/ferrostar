@@ -2,18 +2,12 @@ package com.stadiamaps.ferrostar
 
 import android.location.Location
 import android.util.Log
-import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.viewModelScope
-import com.maplibre.compose.camera.CameraState
-import com.maplibre.compose.camera.MapViewCamera
-import com.maplibre.compose.camera.extensions.incrementZoom
-import com.maplibre.compose.camera.models.CameraPadding
 import com.stadiamaps.ferrostar.core.DefaultNavigationViewModel
 import com.stadiamaps.ferrostar.core.FerrostarCore
 import com.stadiamaps.ferrostar.core.NavigationUiState
 import com.stadiamaps.ferrostar.core.annotation.AnnotationPublisher
 import com.stadiamaps.ferrostar.core.annotation.valhalla.valhallaExtendedOSRMAnnotationPublisher
-import com.stadiamaps.ferrostar.core.boundingBox
 import com.stadiamaps.ferrostar.core.location.NavigationLocationProvider
 import com.stadiamaps.ferrostar.core.location.toUserLocation
 import com.stadiamaps.ferrostar.support.initialSimulatedLocation
@@ -23,25 +17,41 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import org.maplibre.android.geometry.LatLngBounds
 import uniffi.ferrostar.GeographicCoordinate
 import uniffi.ferrostar.UserLocation
 import uniffi.ferrostar.Waypoint
 import uniffi.ferrostar.WaypointKind
+
+data class DestinationSelection(
+    val coordinate: GeographicCoordinate,
+    val label: String? = null,
+    val origin: DestinationSelectionOrigin = DestinationSelectionOrigin.MapLongPress,
+)
+
+enum class DestinationSelectionOrigin {
+  MapLongPress,
+  SearchResult,
+}
+
+data class DemoNavigationSceneState(
+    val droppedPin: GeographicCoordinate? = null,
+    val selectedDestination: DestinationSelection? = null,
+    val isDestinationSheetVisible: Boolean = false,
+    val destinationSheetHeightPx: Int = 0,
+)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DemoNavigationViewModel(
     // This is a simple example, but these would typically be dependency injected
     val ferrostarCore: FerrostarCore = AppModule.ferrostarCore,
     val locationProvider: NavigationLocationProvider = AppModule.locationProvider,
-    annotationPublisher: AnnotationPublisher<*> = valhallaExtendedOSRMAnnotationPublisher()
+    annotationPublisher: AnnotationPublisher<*> = valhallaExtendedOSRMAnnotationPublisher(),
 ) : DefaultNavigationViewModel(ferrostarCore, annotationPublisher) {
 
   private val _hasLocationPermission = MutableStateFlow(false)
@@ -51,6 +61,9 @@ class DemoNavigationViewModel(
 
   private val locationStateFlow = MutableStateFlow<UserLocation?>(null)
   val location = locationStateFlow.asStateFlow()
+
+  private val _sceneState = MutableStateFlow(DemoNavigationSceneState())
+  val sceneState = _sceneState.asStateFlow()
 
   // Here's an example of injecting a custom location into the navigation UI state when isNavigating
   // is false.
@@ -66,22 +79,20 @@ class DemoNavigationViewModel(
           .stateIn(
               scope = viewModelScope,
               started = SharingStarted.WhileSubscribed(),
-              initialValue = NavigationUiState.empty())
+              initialValue = NavigationUiState.empty(),
+          )
 
   init {
     viewModelScope.launch {
       _hasLocationPermission
           .flatMapLatest { hasPermission ->
-            if (hasPermission) {
-              locationProvider.locationUpdates(5000L)
-                  .map { it.toUserLocation() }
-            } else {
+            if (!hasPermission) {
               flowOf(initialSimulatedLocation)
+            } else {
+              locationProvider.locationUpdates(5000L).map { it.toUserLocation() }
             }
           }
-          .collect {
-            locationStateFlow.emit(it)
-          }
+          .collect { locationStateFlow.emit(it) }
     }
   }
 
@@ -91,27 +102,70 @@ class DemoNavigationViewModel(
 
   fun toggleSimulation() {
     _simulated.value = !_simulated.value
+    if (!_simulated.value) {
+      locationProvider.disableSimulation()
+    }
   }
 
   fun enableAutoDriveSimulation() {
     _simulated.value = true
   }
 
-  init {
-    viewModelScope.launch {
-      _hasLocationPermission
-          .flatMapLatest { hasPermission ->
-            if (hasPermission) {
-              locationProvider.locationUpdates(5000L)
-                  .map { it.toUserLocation() }
-            } else {
-              flowOf(initialSimulatedLocation)
-            }
-          }
-          .collect {
-            locationStateFlow.emit(it)
-          }
+  fun selectDestination(
+      coordinate: GeographicCoordinate,
+      label: String? = null,
+      origin: DestinationSelectionOrigin = DestinationSelectionOrigin.MapLongPress,
+  ) {
+    _sceneState.value =
+        _sceneState.value.copy(
+            droppedPin = coordinate,
+            selectedDestination =
+                DestinationSelection(coordinate = coordinate, label = label, origin = origin),
+            isDestinationSheetVisible = true,
+        )
+  }
+
+  fun selectDestination(
+      location: Location,
+      label: String? = null,
+      origin: DestinationSelectionOrigin = DestinationSelectionOrigin.MapLongPress,
+  ) {
+    selectDestination(
+        coordinate = GeographicCoordinate(location.latitude, location.longitude),
+        label = label,
+        origin = origin,
+    )
+  }
+
+  fun clearSelectedDestination() {
+    _sceneState.value =
+        _sceneState.value.copy(
+            droppedPin = null,
+            selectedDestination = null,
+            isDestinationSheetVisible = false,
+            destinationSheetHeightPx = 0,
+        )
+  }
+
+  fun hideDestinationSheet() {
+    _sceneState.value =
+        _sceneState.value.copy(
+            isDestinationSheetVisible = false,
+            destinationSheetHeightPx = 0,
+        )
+  }
+
+  fun setDestinationSheetHeight(heightPx: Int) {
+    if (_sceneState.value.destinationSheetHeightPx == heightPx) {
+      return
     }
+    _sceneState.value = _sceneState.value.copy(destinationSheetHeightPx = heightPx)
+  }
+
+  fun startSelectedDestinationNavigation() {
+    val destination = sceneState.value.selectedDestination ?: return
+    clearSelectedDestination()
+    startNavigation(destination.coordinate, destination.label)
   }
 
   override fun toggleMute() {
@@ -124,6 +178,13 @@ class DemoNavigationViewModel(
   }
 
   fun startNavigation(destination: Location, name: String?) {
+    startNavigation(
+        destination = GeographicCoordinate(destination.latitude, destination.longitude),
+        name = name,
+    )
+  }
+
+  fun startNavigation(destination: GeographicCoordinate, name: String? = null) {
     viewModelScope.launch(Dispatchers.IO) {
       // TODO: Fail gracefully
       val lastLocation = location.value ?: return@launch
@@ -135,11 +196,9 @@ class DemoNavigationViewModel(
           ferrostarCore.getRoutes(
               lastLocation,
               listOf(
-                  Waypoint(
-                      coordinate =
-                          GeographicCoordinate(destination.latitude, destination.longitude),
-                      kind = WaypointKind.BREAK),
-              ))
+                  Waypoint(coordinate = destination, kind = WaypointKind.BREAK),
+              ),
+          )
 
       val route = routes.first()
 
@@ -147,63 +206,17 @@ class DemoNavigationViewModel(
         locationProvider.enableSimulationOn(route)
       }
 
-      ferrostarCore.startNavigation(route = route)
+      if (navigationUiState.value.isNavigating()) {
+        ferrostarCore.replaceRoute(route = route)
+      } else {
+        ferrostarCore.startNavigation(route = route)
+      }
     }
   }
 
   override fun stopNavigation() {
     locationProvider.disableSimulation()
     ferrostarCore.stopNavigation()
-  }
-
-  val mapViewCamera = mutableStateOf(
-      MapViewCamera.TrackingUserLocation()
-  )
-  val cameraPadding = mutableStateOf(CameraPadding())
-  val navigationCamera = mutableStateOf(MapViewCamera.TrackingUserLocationWithBearing(zoom = 16.0, pitch = 45.0))
-
-  fun isTrackingUser(): Boolean =
-      when (mapViewCamera.value.state) {
-        is CameraState.TrackingUserLocation,
-        is CameraState.TrackingUserLocationWithBearing -> true
-        else -> false
-      }
-
-  fun zoomIn() {
-    mapViewCamera.value = mapViewCamera.value.incrementZoom(1.0)
-  }
-
-  fun zoomOut() {
-    mapViewCamera.value = mapViewCamera.value.incrementZoom(-1.0)
-  }
-
-  fun centerCamera() {
-    if (isTrackingUser()) {
-      centerOnRoute()
-    } else {
-      centerOnUser()
-    }
-  }
-
-  private fun centerOnRoute() {
-    val boundingBox = navigationUiState.value.routeGeometry?.boundingBox()
-    boundingBox?.let {
-      val latLngBounds = LatLngBounds.from(
-          boundingBox.north,
-          boundingBox.east,
-          boundingBox.south,
-          boundingBox.west
-      )
-      mapViewCamera.value = MapViewCamera.BoundingBox(
-          latLngBounds,
-          pitch = 0.0,
-          padding = cameraPadding.value
-      )
-    }
-  }
-
-  private fun centerOnUser() {
-    mapViewCamera.value = navigationCamera.value
   }
 
   companion object {

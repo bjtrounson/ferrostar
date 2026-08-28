@@ -7,9 +7,9 @@ vi.mock('@stadiamaps/ferrostar-uniffi-react-native', () => ({
     fromWellKnownRouteProvider: vi.fn(),
   },
   RouteDeviation: {
-    OffRoute: {
+    Deviation: {
       instanceOf: (value: { tag?: string } | undefined) =>
-        value?.tag === 'OffRoute',
+        value?.tag === 'Deviation',
     },
   },
   TripState: {

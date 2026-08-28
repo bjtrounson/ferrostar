@@ -2,9 +2,9 @@
 use crate::navigation_controller::{
     models::TripState,
     step_advance::conditions::{
-        AndAdvanceConditions, DistanceEntryAndExitCondition, DistanceEntryAndSnappedExitCondition,
-        DistanceFromStepCondition, DistanceToEndOfStepCondition, ManualStepCondition,
-        OrAdvanceConditions,
+        AndAdvanceConditions, DeviationCalculationPolicy, DistanceEntryAndExitCondition,
+        DistanceEntryAndSnappedExitCondition, DistanceFromStepCondition,
+        DistanceToEndOfStepCondition, ManualStepCondition, OrAdvanceConditions,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -105,36 +105,47 @@ pub trait StepAdvanceCondition: StepAdvanceConditionSerializable + Sync + Send {
 #[cfg_attr(feature = "wasm-bindgen", tsify(from_wasm_abi))]
 pub enum SerializableStepAdvanceCondition {
     Manual,
-    #[cfg_attr(feature = "wasm-bindgen", serde(rename_all = "camelCase"))]
+    #[serde(rename_all = "camelCase")]
     DistanceToEndOfStep {
         distance: u16,
+        #[serde(alias = "minimum_horizontal_accuracy")]
         minimum_horizontal_accuracy: u16,
     },
-    #[cfg_attr(feature = "wasm-bindgen", serde(rename_all = "camelCase"))]
+    #[serde(rename_all = "camelCase")]
     DistanceFromStep {
         distance: u16,
+        #[serde(alias = "minimum_horizontal_accuracy")]
         minimum_horizontal_accuracy: u16,
-        calculate_while_off_route: bool,
+        #[serde(alias = "calculation_policy")]
+        calculation_policy: DeviationCalculationPolicy,
     },
-    #[cfg_attr(feature = "wasm-bindgen", serde(rename_all = "camelCase"))]
+    #[serde(rename_all = "camelCase")]
     DistanceEntryExit {
+        #[serde(alias = "distance_to_end_of_step")]
         distance_to_end_of_step: u16,
+        #[serde(alias = "distance_after_end_step")]
         distance_after_end_step: u16,
+        #[serde(alias = "minimum_horizontal_accuracy")]
         minimum_horizontal_accuracy: u16,
+        #[serde(alias = "has_reached_end_of_current_step")]
         has_reached_end_of_current_step: bool,
     },
-    #[cfg_attr(feature = "wasm-bindgen", serde(rename_all = "camelCase"))]
+    #[serde(rename_all = "camelCase")]
     DistanceEntryAndSnappedExit {
+        #[serde(alias = "distance_to_end_of_step")]
         distance_to_end_of_step: u16,
+        #[serde(alias = "distance_after_end_step")]
         distance_after_end_step: u16,
+        #[serde(alias = "minimum_horizontal_accuracy")]
         minimum_horizontal_accuracy: u16,
+        #[serde(alias = "has_reached_end_of_current_step")]
         has_reached_end_of_current_step: bool,
     },
-    #[cfg_attr(feature = "wasm-bindgen", serde(rename_all = "camelCase"))]
+    #[serde(rename_all = "camelCase")]
     OrAdvanceConditions {
         conditions: Vec<SerializableStepAdvanceCondition>,
     },
-    #[cfg_attr(feature = "wasm-bindgen", serde(rename_all = "camelCase"))]
+    #[serde(rename_all = "camelCase")]
     AndAdvanceConditions {
         conditions: Vec<SerializableStepAdvanceCondition>,
     },
@@ -154,11 +165,11 @@ impl From<SerializableStepAdvanceCondition> for Arc<dyn StepAdvanceCondition> {
             SerializableStepAdvanceCondition::DistanceFromStep {
                 distance,
                 minimum_horizontal_accuracy,
-                calculate_while_off_route,
+                calculation_policy,
             } => Arc::new(DistanceFromStepCondition {
                 distance,
                 minimum_horizontal_accuracy,
-                calculate_while_off_route,
+                calculation_policy,
             }),
             SerializableStepAdvanceCondition::DistanceEntryExit {
                 minimum_horizontal_accuracy,
@@ -225,19 +236,24 @@ pub fn step_advance_distance_to_end_of_step(
 
 /// Convenience function for creating a [`DistanceFromStepCondition`].
 ///
-/// This advances to the next step when the user is at least `distance` meters away _from_ any point on the current route step geometry.
-/// Does not advance unless the reported location accuracy is `minimum_horizontal_accuracy` meters or better.
+/// This advances to the next step when the user is at least `distance` meters away from any point
+/// on the current route step geometry.
+/// Does not advance unless the reported location accuracy is `minimum_horizontal_accuracy`
+/// meters or better.
+///
+/// `calculation_policy` controls when this condition is permitted to evaluate
+/// based on the user's current route deviation status.
 #[cfg(feature = "uniffi")]
 #[uniffi::export]
 pub fn step_advance_distance_from_step(
     distance: u16,
     minimum_horizontal_accuracy: u16,
-    calculate_while_off_route: bool,
+    calculation_policy: DeviationCalculationPolicy,
 ) -> Arc<dyn StepAdvanceCondition> {
     Arc::new(DistanceFromStepCondition {
         distance,
         minimum_horizontal_accuracy,
-        calculate_while_off_route,
+        calculation_policy,
     })
 }
 

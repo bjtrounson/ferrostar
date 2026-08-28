@@ -413,8 +413,8 @@ export class FerrostarCore implements LocationObserver {
 
     const { deviation: routeDeviation, remainingWaypoints } = tripState.inner;
 
-    // 2. Guard: Must be off-route for recalculation logic
-    if (!RouteDeviation.OffRoute.instanceOf(routeDeviation)) {
+    // 2. Guard: Must be deviating from the current step for recalculation logic
+    if (!RouteDeviation.Deviation.instanceOf(routeDeviation)) {
       this.speakTTS(tripState.inner.spokenInstruction);
       this.notifyStateListeners();
       return;
@@ -443,7 +443,7 @@ export class FerrostarCore implements LocationObserver {
     const action =
       this.deviationHandler?.correctiveActionForDeviation(
         this,
-        routeDeviation.inner.deviationFromRouteLine,
+        routeDeviation.inner.kind,
         remainingWaypoints
       ) ?? CorrectiveAction.GetNewRoutes;
 
@@ -467,7 +467,7 @@ export class FerrostarCore implements LocationObserver {
         // Verify we are still in a state that needs this new route
         if (
           TripState.Navigating.instanceOf(this._state.tripState) &&
-          RouteDeviation.OffRoute.instanceOf(
+          RouteDeviation.Deviation.instanceOf(
             this._state.tripState.inner.deviation
           )
         ) {
