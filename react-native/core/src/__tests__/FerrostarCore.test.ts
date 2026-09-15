@@ -9,6 +9,14 @@ vi.mock('@stadiamaps/ferrostar-uniffi-react-native', () => ({
       return [];
     }
 
+    getRecordingChunk(options: { cursor: number; maxBytes: number }) {
+      return {
+        json: '{"events":[]}',
+        nextCursor: options.cursor,
+        done: true,
+      };
+    }
+
     getRecordingJson(): string {
       return '{"events":[]}';
     }
@@ -32,7 +40,7 @@ vi.mock('@stadiamaps/ferrostar-uniffi-react-native', () => ({
     },
   },
   UserLocation: {
-    new: (location: unknown) => location,
+    new: vi.fn((location: unknown) => location),
   },
   advanceLocationSimulation: vi.fn(),
   locationSimulationFromRoute: vi.fn(),
@@ -41,6 +49,7 @@ vi.mock('@stadiamaps/ferrostar-uniffi-react-native', () => ({
 import {
   createNavigationSession,
   NavigationRecorder,
+  UserLocation,
 } from '@stadiamaps/ferrostar-uniffi-react-native';
 import { FerrostarCore } from '../FerrostarCore';
 import type {
@@ -276,6 +285,132 @@ describe('FerrostarCore lifecycle', () => {
     expect(session.getInitialState).toHaveBeenCalledWith(location);
   });
 
+  it('starts from the route origin before the first location fix', async () => {
+    const session = mockSession();
+    const locationProvider = new FakeLocationProvider();
+    const core = new FerrostarCore(
+      {} as ConstructorParameters<typeof FerrostarCore>[0],
+      locationProvider,
+      createRouteProvider()
+    );
+    const route = createRoute();
+
+    await core.connectLocationProvider(locationProvider);
+    core.startNavigation(route);
+
+    expect(UserLocation.new).toHaveBeenCalledWith(
+      expect.objectContaining({ coordinates: route.geometry[0] })
+    );
+    expect(session.getInitialState).toHaveBeenCalledOnce();
+    expect(core._state.navState).toBe(session.getInitialState.mock.results[0]?.value);
+    expect(core._state.routeGeometry).toBe(route.geometry);
+
+    const firstLocation = createLocation('first');
+    locationProvider.emitLocation(firstLocation);
+    expect(session.getInitialState).toHaveBeenCalledOnce();
+    expect(session.updateUserLocation).toHaveBeenCalledWith(
+      firstLocation,
+      session.getInitialState.mock.results[0]?.value
+    );
+
+    const nextLocation = createLocation('next');
+    locationProvider.emitLocation(nextLocation);
+    expect(session.updateUserLocation).toHaveBeenCalledWith(
+      nextLocation,
+      session.updateUserLocation.mock.results[0]?.value
+    );
+  });
+
+  it('uses the route origin when there is no last location', () => {
+    const session = mockSession();
+    const locationProvider = new FakeLocationProvider();
+    const location = createLocation();
+    locationProvider.snapshot = { location };
+    const core = new FerrostarCore(
+      {} as ConstructorParameters<typeof FerrostarCore>[0],
+      locationProvider,
+      createRouteProvider()
+    );
+
+    const route = createRoute();
+    core.startNavigation(route);
+
+    expect(UserLocation.new).toHaveBeenCalledWith(
+      expect.objectContaining({ coordinates: route.geometry[0] })
+    );
+    expect(session.getInitialState).toHaveBeenCalledOnce();
+  });
+
+  it('does not initialize a stopped session when the first fix arrives', async () => {
+    const session = mockSession();
+    const locationProvider = new FakeLocationProvider();
+    const core = new FerrostarCore(
+      {} as ConstructorParameters<typeof FerrostarCore>[0],
+      locationProvider,
+      createRouteProvider()
+    );
+    await core.connectLocationProvider(locationProvider);
+
+    core.startNavigation(createRoute());
+    core.stopNavigation();
+    locationProvider.emitLocation(createLocation());
+
+    expect(session.getInitialState).toHaveBeenCalledOnce();
+    expect(session.updateUserLocation).not.toHaveBeenCalled();
+    expect(core._state.navState).toBeUndefined();
+    expect(core._state.routeGeometry).toEqual([]);
+  });
+
+  it('starts a replacement route from its first point before the first fix', async () => {
+    const firstSession = mockSession();
+    const locationProvider = new FakeLocationProvider();
+    const core = new FerrostarCore(
+      {} as ConstructorParameters<typeof FerrostarCore>[0],
+      locationProvider,
+      createRouteProvider()
+    );
+    await core.connectLocationProvider(locationProvider);
+
+    core.startNavigation(createRoute());
+    const replacementRoute = createRoute();
+    replacementRoute.geometry = [{ lat: 3, lng: 4 }];
+    const replacementSession = mockSession();
+    core.replaceRoute(replacementRoute);
+
+    expect(firstSession.getInitialState).toHaveBeenCalledOnce();
+    expect(replacementSession.getInitialState).toHaveBeenCalledOnce();
+    expect(UserLocation.new).toHaveBeenLastCalledWith(
+      expect.objectContaining({ coordinates: replacementRoute.geometry[0] })
+    );
+    const location = createLocation();
+    locationProvider.emitLocation(location);
+    expect(replacementSession.updateUserLocation).toHaveBeenCalledWith(
+      location,
+      replacementSession.getInitialState.mock.results[0]?.value
+    );
+    expect(core._state.routeGeometry).toBe(replacementRoute.geometry);
+  });
+
+  it('rejects a route without geometry when there is no location', async () => {
+    const session = mockSession();
+    const locationProvider = new FakeLocationProvider();
+    const core = new FerrostarCore(
+      {} as ConstructorParameters<typeof FerrostarCore>[0],
+      locationProvider,
+      createRouteProvider()
+    );
+    await core.connectLocationProvider(locationProvider);
+
+    expect(() => core.startNavigation({ geometry: [] } as any)).toThrow(
+      'cannot start navigation with an empty route geometry'
+    );
+    expect(session.getInitialState).not.toHaveBeenCalled();
+
+    const location = createLocation();
+    locationProvider.emitLocation(location);
+    expect(session.getInitialState).not.toHaveBeenCalled();
+  });
+
   it('notifies listeners with updated state for location updates', async () => {
     const session = mockSession();
     const locationProvider = new FakeLocationProvider();
@@ -287,6 +422,7 @@ describe('FerrostarCore lifecycle', () => {
     const listener = vi.fn();
 
     await core.connectLocationProvider(locationProvider);
+    locationProvider.emitLocation(createLocation('before-start'));
     core.startNavigation(createRoute());
     core.addStateListener(listener);
     locationProvider.emitLocation(createLocation());
@@ -394,6 +530,13 @@ describe('FerrostarCore lifecycle', () => {
     expectTypeOf(recording).toMatchTypeOf<NavigationRecording>();
     expect(recording).toBeInstanceOf(NavigationRecorder);
     expect(recording.getRecordingJson()).toBe('{"events":[]}');
+    expect(
+      recording.getRecordingChunk({ cursor: 0, maxBytes: 2_000_000 })
+    ).toEqual({
+      json: '{"events":[]}',
+      nextCursor: 0,
+      done: true,
+    });
     expect(createNavigationSession).toHaveBeenLastCalledWith(route, config, [
       recording,
     ]);

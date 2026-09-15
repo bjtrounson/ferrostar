@@ -1,6 +1,13 @@
 import type {
   NavigationControllerConfig,
+  NavigationRecordingChunk,
+  NavigationRecordingChunkOptions,
   NavigationRecordingEvent,
+} from '@stadiamaps/ferrostar-uniffi-react-native';
+
+export type {
+  NavigationRecordingChunk,
+  NavigationRecordingChunkOptions,
 } from '@stadiamaps/ferrostar-uniffi-react-native';
 
 /**
@@ -11,6 +18,13 @@ import type {
  */
 export interface NavigationRecording {
   getEvents(): ReadonlyArray<NavigationRecordingEvent>;
+  /**
+   * Exports a complete recording JSON document bounded by `maxBytes`.
+   * Pass each `nextCursor` back in until `done` is true.
+   */
+  getRecordingChunk(
+    options: NavigationRecordingChunkOptions
+  ): NavigationRecordingChunk;
   getRecordingJson(): string;
 }
 

@@ -90,6 +90,53 @@ pub enum RecordingError {
     /// Error during deserialization.
     #[error("failed to deserialize navigation recording: {error}")]
     DeserializationError { error: String },
+
+    /// The supplied cursor is beyond the current event stream.
+    #[error("recording chunk cursor {cursor} exceeds event count {event_count}")]
+    InvalidChunkCursor { cursor: u32, event_count: u32 },
+
+    /// The byte limit cannot contain the recording metadata and an empty event array.
+    #[error(
+        "recording chunk byte limit {max_bytes} is smaller than the minimum size {minimum_bytes}"
+    )]
+    ChunkSizeTooSmall { max_bytes: u32, minimum_bytes: u64 },
+
+    /// A single event cannot fit in a chunk without being split.
+    #[error(
+        "recording event at cursor {cursor} requires {required_bytes} bytes, exceeding chunk byte limit {max_bytes}"
+    )]
+    EventTooLarge {
+        cursor: u32,
+        event_bytes: u64,
+        required_bytes: u64,
+        max_bytes: u32,
+    },
+
+    /// The in-memory recording cannot currently be read.
+    #[error("navigation recording is unavailable")]
+    RecordingUnavailable,
+}
+
+/// Parameters for exporting a bounded section of a navigation recording.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct NavigationRecordingChunkOptions {
+    /// Zero-based index of the first event to export.
+    pub cursor: u32,
+    /// Maximum UTF-8 byte length of the returned JSON.
+    pub max_bytes: u32,
+}
+
+/// A bounded, non-destructive section of a navigation recording.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct NavigationRecordingChunk {
+    /// A complete recording JSON document containing the selected events.
+    pub json: String,
+    /// Cursor to pass to the next export call.
+    pub next_cursor: u32,
+    /// Whether the chunk reached the current end of the event stream.
+    pub done: bool,
 }
 
 /// An event that occurs during navigation.
